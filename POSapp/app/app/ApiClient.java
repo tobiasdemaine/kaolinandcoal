@@ -18,7 +18,9 @@ public class ApiClient {
     // Use 10.0.2.2 when running with an emulator
     // See
     // https://developer.android.com/studio/run/emulator-networking.html#networkaddresses
-    public static final String BACKEND_URL = "http://localhost:4242";
+    //public static final String BACKEND_URL = "https://terminal.kaolinandcoal.com";
+    //public static final String BACKEND_URL = "http://localhost:4242";
+    public static final String BACKEND_URL = "http://10.0.2.2:4242";
 
     private static final OkHttpClient mClient = new OkHttpClient.Builder()
             .addNetworkInterceptor(new StethoInterceptor())
