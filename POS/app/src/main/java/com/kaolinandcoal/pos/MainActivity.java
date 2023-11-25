@@ -11,6 +11,7 @@ import android.os.Bundle;
 import android.provider.Settings;
 import android.view.ContextThemeWrapper;
 import android.view.View;
+import android.widget.EditText;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -18,6 +19,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -26,6 +28,7 @@ import com.stripe.stripeterminal.Terminal;
 import com.stripe.stripeterminal.external.callable.Callback;
 import com.stripe.stripeterminal.external.callable.DiscoveryListener;
 import com.stripe.stripeterminal.external.callable.PaymentIntentCallback;
+import com.stripe.stripeterminal.external.models.CollectConfiguration;
 import com.stripe.stripeterminal.external.models.DiscoveryConfiguration;
 //import com.stripe.stripeterminal.external.models.DiscoveryMethod;
 import com.stripe.stripeterminal.external.models.PaymentIntent;
@@ -54,7 +57,7 @@ public class MainActivity extends AppCompatActivity {
 
     // Register the permissions callback to handles the response to the system
     // permissions dialog.
-    private final ActivityResultLauncher requestPermissionLauncher = registerForActivityResult(
+    private final ActivityResultLauncher<String[]> requestPermissionLauncher = registerForActivityResult(
             new ActivityResultContracts.RequestMultiplePermissions(),
             result -> MainActivity.this.onPermissionResult(result));
 
@@ -78,7 +81,7 @@ public class MainActivity extends AppCompatActivity {
     private final PaymentIntentCallback createPaymentIntentCallback = new PaymentIntentCallback() {
         @Override
         public void onSuccess(@NonNull PaymentIntent paymentIntent) {
-            Terminal.getInstance().collectPaymentMethod(paymentIntent, collectPaymentMethodCallback,null);
+            Terminal.getInstance().collectPaymentMethod(paymentIntent, collectPaymentMethodCallback, new CollectConfiguration.Builder().build());
         }
 
         @Override
@@ -105,11 +108,16 @@ public class MainActivity extends AppCompatActivity {
     private final PaymentIntentCallback confirmPaymentIntentCallback = new PaymentIntentCallback() {
         @Override
         public void onSuccess(@NonNull PaymentIntent paymentIntent) {
+            findViewById(R.id.progressBar).setVisibility(View.INVISIBLE);
             try {
                 ApiClient.capturePaymentIntent(paymentIntent.getId());
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
+            EditText amountWidget = findViewById(R.id.saleAmount);
+            amountWidget.getText().clear();
+            EditText descriptionWidget = findViewById(R.id.saleDescription);
+            descriptionWidget.getText().clear();
             runOnUiThread(() -> {
                 new AlertDialog.Builder(new ContextThemeWrapper(MainActivity.this,
                         R.style.Theme_MaterialComponents_DayNight_DarkActionBar1))
@@ -125,6 +133,33 @@ public class MainActivity extends AppCompatActivity {
 
     private void startPayment() {
         // Step 1: create payment intent
+
+        EditText amountWidget = findViewById(R.id.saleAmount);
+        Long amount = 0L;
+        try{
+            amount = Long.parseLong(amountWidget.getText().toString())*100;
+        } catch (Exception e) {
+            runOnUiThread(() -> {
+                new AlertDialog.Builder(new ContextThemeWrapper(MainActivity.this,
+                        R.style.Theme_MaterialComponents_DayNight_DarkActionBar1))
+                        .setMessage("You must specify an amount").setCancelable(true).create().show();
+            });
+            return;
+        }
+        EditText descriptionWidget = findViewById(R.id.saleDescription);
+        String description = descriptionWidget.getText().toString();
+
+
+
+        findViewById(R.id.progressBar).setVisibility(View.VISIBLE);
+
+        final PaymentIntentParameters paymentIntentParams = new PaymentIntentParameters.Builder(
+                Arrays.asList(PaymentMethodType.CARD_PRESENT))
+                .setAmount(amount)
+                .setCurrency("aud")
+                .setDescription(description)
+                .build();
+
         Terminal.getInstance()
                 .createPaymentIntent(paymentIntentParams, createPaymentIntentCallback);
     }
@@ -193,6 +228,16 @@ public class MainActivity extends AppCompatActivity {
             }
         };
 
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            // TODO: Consider calling
+            //    ActivityCompat#requestPermissions
+            // here to request the missing permissions, and then overriding
+            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+            //                                          int[] grantResults)
+            // to handle the case where the user grants the permission. See the documentation
+            // for ActivityCompat#requestPermissions for more details.
+            return;
+        }
         Terminal.getInstance()
                 .discoverReaders(discoveryConfig, discoveryListener, discoveryCallback);
 
@@ -200,9 +245,18 @@ public class MainActivity extends AppCompatActivity {
 
     void updateReaderConnection(boolean isConnected) {
         final RecyclerView recyclerView = findViewById(R.id.reader_recycler_view);
-
+        /* we can put all of this in a view and use a new sale button to display it*/
         findViewById(R.id.collect_payment_button)
                 .setVisibility(isConnected ? View.VISIBLE : View.INVISIBLE);
+        findViewById(R.id.saleAmountText)
+                .setVisibility(isConnected ? View.VISIBLE : View.INVISIBLE);
+        findViewById(R.id.saleAmount)
+                .setVisibility(isConnected ? View.VISIBLE : View.INVISIBLE);
+        findViewById(R.id.saleDescriptionText)
+                .setVisibility(isConnected ? View.VISIBLE : View.INVISIBLE);
+        findViewById(R.id.saleDescription)
+                .setVisibility(isConnected ? View.VISIBLE : View.INVISIBLE);
+
         findViewById(R.id.discover_button)
                 .setVisibility(isConnected ? View.INVISIBLE : View.VISIBLE);
 
@@ -211,6 +265,8 @@ public class MainActivity extends AppCompatActivity {
         if (!isConnected) {
             recyclerView.setLayoutManager(new LinearLayoutManager(this));
             recyclerView.setAdapter(readerAdapter);
+        }else{
+            findViewById(R.id.progressBar).setVisibility(View.INVISIBLE);
         }
     }
 
@@ -224,6 +280,16 @@ public class MainActivity extends AppCompatActivity {
 
         if (BluetoothAdapter.getDefaultAdapter() != null &&
                 !BluetoothAdapter.getDefaultAdapter().isEnabled()) {
+            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                // TODO: Consider calling
+                //    ActivityCompat#requestPermissions
+                // here to request the missing permissions, and then overriding
+                //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+                //                                          int[] grantResults)
+                // to handle the case where the user grants the permission. See the documentation
+                // for ActivityCompat#requestPermissions for more details.
+                return;
+            }
             BluetoothAdapter.getDefaultAdapter().enable();
         }
 
@@ -255,7 +321,7 @@ public class MainActivity extends AppCompatActivity {
         // Check for location permissions
         if (!isGranted(Manifest.permission.ACCESS_FINE_LOCATION)) {
             // If we don't have them yet, request them before doing anything else
-            requestPermissionLauncher.launch(Arrays.asList(Manifest.permission.ACCESS_FINE_LOCATION));
+            requestPermissionLauncher.launch(Arrays.asList(Manifest.permission.ACCESS_FINE_LOCATION).toArray(new String[0]));
         } else if (!Terminal.isInitialized() && verifyGpsEnabled()) {
             initialize();
         }

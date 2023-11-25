@@ -1,5 +1,7 @@
 package com.kaolinandcoal.pos;
 
+import android.view.View;
+
 import androidx.annotation.NonNull;
 
 import com.stripe.stripeterminal.Terminal;
@@ -37,6 +39,9 @@ public class ReaderClickListener {
             // reader.
             throw new RuntimeException("No location ID available");
         }
+
+        final MainActivity activity = activityRef.get();
+        activity.findViewById(R.id.progressBar).setVisibility(View.VISIBLE);
 
         ConnectionConfiguration.BluetoothConnectionConfiguration connectionConfig = new ConnectionConfiguration.BluetoothConnectionConfiguration(
                 locationId);
