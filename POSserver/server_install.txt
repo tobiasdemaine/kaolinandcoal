@@ -1,0 +1,22 @@
+
+
+
+sftp root@where-ever  <<< "put deploy.tar.gz"
+
+
+ssh user@yourserver.com
+
+$ docker rmi KCpos
+$ docker stop KCpos
+$ docker rm KCpos
+$ docker load < deploy.tar.gz
+
+docker run -d --restart always 
+    --name KCpos
+    --env "VIRTUAL_PORT=4242"  \
+    --env "VIRTUAL_HOST=pos.kaolinandcoal.com"  \
+    --env "LETSENCRYPT_HOST=pos.kaolinandcoal.com" \
+    --env "LETSENCRYPT_EMAIL=tobiasdemaine@gmail.com" \
+    -v /root/KCpos:/app \
+    -p 127.0.0.1:4242:4242 \
+    KCpos:latest"
